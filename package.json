@@ -1,0 +1,27 @@
+{
+  "name": "phpconv",
+  "version": "1.0.0",
+  "description": "php project to html converter",
+  "main": "index.js",
+  "bin": {
+    "phpconv": "./index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jnafolayan/phpconv.git"
+  },
+  "keywords": [
+    "php",
+    "html",
+    "converter"
+  ],
+  "author": "John Afolayan <jnafolayan@gmail.com> (jnafolayan.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jnafolayan/phpconv/issues"
+  },
+  "homepage": "https://github.com/jnafolayan/phpconv#readme"
+}
