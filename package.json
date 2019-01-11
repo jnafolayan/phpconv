@@ -23,5 +23,9 @@
   "bugs": {
     "url": "https://github.com/jnafolayan/phpconv/issues"
   },
-  "homepage": "https://github.com/jnafolayan/phpconv#readme"
+  "homepage": "https://github.com/jnafolayan/phpconv#readme",
+  "dependencies": {
+    "chokidar": "^2.0.4",
+    "commander": "^2.19.0"
+  }
 }

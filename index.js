@@ -4,13 +4,24 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const path = require('path');
 
-const WATCH_DIRNAME = stripPathAttrib(process.argv[2]);
-const WATCH_DIR = path.resolve(__dirname, WATCH_DIRNAME);
-const OUT_DIRNAME = stripPathAttrib(process.argv[3]);
-const OUT_DIR = path.resolve(__dirname, OUT_DIRNAME);
+const chokidar = require('chokidar');
+const program = require('commander');
+
+let WATCH_DIRNAME,
+	WATCH_DIR,
+	OUT_DIRNAME,
+	OUT_DIR;
+
+program
+	.version('1.0.0', '-v, --version')
+	.option('-o, --out [dest]', 'The destination folder')
+	.option('-w, --watch', 'Watch source for any file changes')
+	.command('phpconv <src>');
+
+program.parse(process.argv);
 
 function stripPathAttrib(str) {
-	return path.resolve(str).split('/').pop().replace(/[.\/]/g, '');
+	return path.resolve(str).split('/').pop();
 }
 
 /**
@@ -28,18 +39,46 @@ let running = false;
 let runID = -1;
 let firstRun = true;
 
-run();	
+WATCH_DIRNAME = stripPathAttrib(program.args[0]);
+WATCH_DIR = path.resolve(__dirname, WATCH_DIRNAME);
+OUT_DIRNAME = stripPathAttrib(program.out);
+OUT_DIR = path.resolve(__dirname, OUT_DIRNAME);
 
-fs.watch(WATCH_DIR, { recursive: true }, (event, filename, ...args) => {
-	if (running) {
-		pendingOp = true;
-	} else {
-		const func = (firstRun || filename.includes('.html')) ? run : runSingle.bind(null, filename);
-		
-		clearTimeout(runID);
-		runID = setTimeout(func, 500);
-	}
-});
+if (program.watch) {
+	const watcher = chokidar.watch('file, dir', {
+		ignored: /(^|[\/\\])\../,
+		persistent: true
+	});
+
+	run();
+
+	watcher.on('change', path => {
+		if (running) {
+			pendingOp = true;
+		} else {
+			const func = (firstRun || filename.includes('.html')) ? run : runSingle.bind(null, filename);
+			
+			clearTimeout(runID);
+			runID = setTimeout(func, 500);
+		}
+	});
+
+	watcher.add(WATCH_DIR);
+} else {
+	getStat(WATCH_DIR)
+		.then(stat => [stat.isDirectory(), stat.isFile()])
+		.then(([isDir, isFile]) => {
+			if (isDir)
+				run();
+			else if (isFile) {
+				if (!path.extname(OUT_DIR))
+					OUT_DIR += '.html';
+				OUT_DIRNAME = OUT_DIR;
+				execCli(`echo random >> ${OUT_DIR}`)
+					.then(() => runSingle(WATCH_DIRNAME));
+			}
+		});
+}
 
 function run() {
 	running = true;
@@ -48,7 +87,7 @@ function run() {
 
 	transpile()
 		.then(() => {
-			console.log(`Transpiled code in ${(Date.now() - time)/1000}s. Still watching...`);
+			console.log(`Transpiled code in ${(Date.now() - time)/1000}s`);
 			firstRun = false;
 
 			if (pendingOp) {
@@ -60,10 +99,10 @@ function run() {
 		});
 }
 
-function runSingle(filename) {
+function runSingle(filename, customOut) {
 	const time = Date.now();
 
-	transpileSingle(filename, true)
+	transpileSingle(filename, true, customOut)
 		.then(() => {
 			console.log(`Transpiled ${filename} in ${(Date.now() - time)/1000}s`);
 		});
@@ -96,12 +135,7 @@ function transpile() {
 				return readdir(folder)
 					.then(content => grabChildren(folder, content, folders, files))
 					.then(() => mkdir(folder.replace(WATCH_DIRNAME, OUT_DIRNAME)))
-					.then(() => folders.length ? next() : null)
-					.catch(handleProbeError);
-			}
-
-			function handleProbeError(error) {
-				console.eror('An error occurred while reading folder ', error);
+					.then(() => folders.length ? next() : null);
 			}
 		}
 
@@ -133,10 +167,10 @@ function transpile() {
 	}
 }
 
-function transpileSingle(file, alreadyExists) {
+function transpileSingle(file, alreadyExists, customOut) {
 	const fullPath = alreadyExists ? path.resolve(WATCH_DIR, file) : file;
 	const newPath = fullPath.replace(WATCH_DIRNAME, OUT_DIRNAME);
-	const inHtml = newPath.replace('.php', '.html');
+	const inHtml = customOut || newPath.replace('.php', '.html');
 
 	if (fullPath.indexOf('.php') !== -1) {
 		if (alreadyExists)
