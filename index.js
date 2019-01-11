@@ -56,7 +56,7 @@ if (program.watch) {
 		if (running) {
 			pendingOp = true;
 		} else {
-			const func = (firstRun || filename.includes('.html')) ? run : runSingle.bind(null, filename);
+			const func = (firstRun || path.includes('.html')) ? run : runSingle.bind(null, path);
 			
 			clearTimeout(runID);
 			runID = setTimeout(func, 500);
