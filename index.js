@@ -1,8 +1,17 @@
+#!/usr/bin/env node
+
 const fs = require('fs');
 const { exec } = require('child_process');
 const path = require('path');
 
-const WATCH_DIR = process.argv(__dirname, process.argv[1]);
+const WATCH_DIRNAME = stripPathAttrib(process.argv[2]);
+const WATCH_DIR = path.resolve(__dirname, WATCH_DIRNAME);
+const OUT_DIRNAME = stripPathAttrib(process.argv[3]);
+const OUT_DIR = path.resolve(__dirname, OUT_DIRNAME);
+
+function stripPathAttrib(str) {
+	return path.resolve(str).split('/').pop().replace(/[.\/]/g, '');
+}
 
 /**
  * Any operation that is triggered will wait till the current one
@@ -39,7 +48,7 @@ function run() {
 
 	transpile()
 		.then(() => {
-			console.log(`Transpiled code in ${(Date.now() - time)/1000}s`);
+			console.log(`Transpiled code in ${(Date.now() - time)/1000}s. Still watching...`);
 			firstRun = false;
 
 			if (pendingOp) {
@@ -66,9 +75,13 @@ function transpile() {
 	function execTranspile() {
 		let dir = WATCH_DIR;
 
-		return execCli('rm -rf ./webclient')
+		return execCli(`rm -rf ${OUT_DIR}`)
 			.then(probeFolders)
-			.then(createFiles);
+			.then(createFiles)
+			.catch(error => {
+				console.error('An error occurred while transpiling');
+				console.error(error);
+			});
 
 
 		function probeFolders() {
@@ -82,8 +95,13 @@ function transpile() {
 				const folder = folders.shift();
 				return readdir(folder)
 					.then(content => grabChildren(folder, content, folders, files))
-					.then(() => mkdir(folder.replace('phpweb', 'webclient')))
-					.then(() => folders.length ? next() : null);
+					.then(() => mkdir(folder.replace(WATCH_DIRNAME, OUT_DIRNAME)))
+					.then(() => folders.length ? next() : null)
+					.catch(handleProbeError);
+			}
+
+			function handleProbeError(error) {
+				console.eror('An error occurred while reading folder ', error);
 			}
 		}
 
@@ -117,7 +135,7 @@ function transpile() {
 
 function transpileSingle(file, alreadyExists) {
 	const fullPath = alreadyExists ? path.resolve(WATCH_DIR, file) : file;
-	const newPath = fullPath.replace('phpweb', 'webclient');
+	const newPath = fullPath.replace(WATCH_DIRNAME, OUT_DIRNAME);
 	const inHtml = newPath.replace('.php', '.html');
 
 	if (fullPath.indexOf('.php') !== -1) {
